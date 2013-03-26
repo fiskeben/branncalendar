@@ -101,7 +101,7 @@ class BrannCalendar
     current_season.xpath(".//tr[@data-competition='tippeligaen']").each do | row |
       @logger.debug "traversing rows in table"
       data = handle_row(row)
-      matches.push(data) if data['home_team'] == 'Brann' && data['date'] > @today
+      matches.push(data) if data['date'] > @today
     end
     matches
   end
