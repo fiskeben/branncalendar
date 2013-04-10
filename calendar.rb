@@ -36,6 +36,10 @@ class BrannCalendar
       end_time = (match['date'] + 60*105).strftime(@date_time_format)
 
       datestamp = Time.new.strftime(@date_time_format)
+      description = "#{match['home_team']} - #{match['away_team']}"
+      unless match['tv'].nil?
+        description = description + "\nVises på #{match['tv']}"
+      end
 
       output << "BEGIN:VEVENT"
       output << "DTSTART:#{start_time}"
@@ -43,7 +47,7 @@ class BrannCalendar
       output << "UID:#{uid}"
       output << "SUMMARY:#{match_string}"
       output << "LOCATION:#{location}"
-      output << "DESCRIPTION:#{match['home_team']} - #{match['away_team']}"
+      output << "DESCRIPTION:#{description}"
       output << "END:VEVENT"
 
 
@@ -89,6 +93,10 @@ class BrannCalendar
     data['date'] = parse_date(row.xpath('td').first.text, row.css('td.date').text)
     data['home_team'] = row.css('td.homeTeam').text
     data['away_team'] = row.css('td.awayTeam').text
+    channel = row.css('td.tvChannel').text.strip
+    unless channel == "-"
+      data['tv'] = channel
+    end
     @logger.debug "parsed row: #{data}"
     data
   end
