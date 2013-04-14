@@ -8,6 +8,10 @@ before do
 end
 
 get '/' do
+  erb :index
+end
+
+get '/kalender' do
   begin
     calendar = BrannCalendar.new
     output = calendar.get
