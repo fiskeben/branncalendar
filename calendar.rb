@@ -38,7 +38,7 @@ class BrannCalendar
       datestamp = Time.new.strftime(@date_time_format)
       description = "#{match['home_team']} - #{match['away_team']}"
       unless match['tv'].nil?
-        description = description + "\nVises på #{match['tv']}"
+        description = description + " (vises på #{match['tv']})"
       end
 
       output << "BEGIN:VEVENT"
