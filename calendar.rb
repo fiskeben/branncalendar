@@ -3,57 +3,41 @@
 require 'open-uri'
 require 'nokogiri'
 require 'logger'
+require './fixture_fetcher'
+require 'waffle_cal'
 
 class BrannCalendar
-  attr_reader :date_time_format, :logger, :today
+  attr_reader :date_time_format, :logger, :today, :competition
   
   def initialize(level = Logger::WARN)
     @logger = Logger.new(STDOUT)
     @logger.level = level
     
-    @date_time_format = "%Y%m%dT%H%M00"
-    @today = Time.new
-    @monthnames = {
-      jan: 1, feb: 2, mar: 3, apr: 4, mai: 5, jun: 6, jul: 7, aug: 8, sep: 9, okt: 10, nov: 11, des: 12
-    }
+    @calendar = WaffleCal::Calendar.new(prod_id)
   end
   
-  def get
-    output = []
-    output << "BEGIN:VCALENDAR"
-    output << "METHOD:PUBLISH"
-    output << "VERSION:2.0"
-    output << "PRODID:-//fiskeben.dk//Brannkalender//NO"
+  def get(competition)
+    FixtureFetcher.all_matches(competition).each do | match |
+      next unless match[:home_team]
 
-    all_matches.each do | match |
-      next if (match['home_team'].nil?)
+      event = WaffleCal::Event.new
 
-      match_string = "#{match['home_team']} - #{match['away_team']}"
-      location = (match['home_team'] == "Brann") ? "Brann Stadion" : ""
-      uid = "#{match['home_team']}-#{match['away_team']}"
+      event.uid = "#{match[:home_team]}-#{match[:away_team]}"
+      event.summary = "#{match[:home_team]} - #{match[:away_team]}"
+      
+      description = event.summary      
+      description += " (vises på #{match[:tv]})" if match[:tv]
 
-      start_time = match['date'].strftime(@date_time_format)
-      end_time = (match['date'] + 60*105).strftime(@date_time_format)
+      event.description = description
+      event.start_time = match[:date]
+      event.end_time = (match[:date] + match_length)
+      
+      event.location = (match[:home_team] == 'Brann') ? 'Brann Stadion' : ''
 
-      datestamp = Time.new.strftime(@date_time_format)
-      description = "#{match['home_team']} - #{match['away_team']}"
-      unless match['tv'].nil?
-        description = description + " (vises på #{match['tv']})"
-      end
-
-      output << "BEGIN:VEVENT"
-      output << "DTSTART:#{start_time}"
-      output << "DTEND:#{end_time}"
-      output << "UID:#{uid}"
-      output << "SUMMARY:#{match_string}"
-      output << "LOCATION:#{location}"
-      output << "DESCRIPTION:#{description}"
-      output << "END:VEVENT"
-
+      @calendar << event
 
     end
-    output << "END:VCALENDAR"
-    output.join("\r\n")
+    @calendar.to_s
   end
   
   def write_file
@@ -62,55 +46,13 @@ class BrannCalendar
     end
   end
   
-  def get_month(name)
-    @monthnames[name.to_sym]
-  end
-  
-  def parse_date(raw_date, time)
-    @logger.debug "parsing date #{raw_date} #{time}"
-    return "" if raw_date.nil? or raw_date.length == 0
+  protected
 
-    parts = raw_date.split("\n")
-    logger.debug "found #{parts}"
-    day = parts[1].strip
-    month = get_month(parts[2].strip)
-    year = parts[3].strip
-    hour, minute = time.split(":")
-    @logger.debug "parsed month: #{month}, day: #{day}, hour: #{hour}, minute: #{minute}"
-    Time.new(year, month, day, hour, minute)
+  def prod_id
+    WaffleCal::ProdId.new({entity_name: 'fiskeben.dk', product_name: 'brannkalender', language: 'no'})
   end
 
-  def fetch_document
-    @logger.debug "fetching document"
-    html = open('http://www.brann.no/fixtures-and-results').read
-    html.encode('utf-8')
-    Nokogiri::HTML(html)
-  end
-
-  def handle_row(row)
-    #@logger.debug "handling a row: #{row}"
-    data = {}
-    data['date'] = parse_date(row.xpath('td').first.text, row.css('td.date').text)
-    data['home_team'] = row.css('td.homeTeam').text
-    data['away_team'] = row.css('td.awayTeam').text
-    channel = row.css('td.tvChannel').text.strip
-    unless channel == "-"
-      data['tv'] = channel
-    end
-    @logger.debug "parsed row: #{data}"
-    data
-  end
-
-  def all_matches
-    @logger.debug "getting all matches"
-    matches = []
-    document = fetch_document
-    current_season = document.xpath("//li[@class='currentFixtureSet']").first
-    current_season.xpath(".//tr[@data-competition='tippeligaen']").each do | row |
-      @logger.debug "traversing rows in table"
-      data = handle_row(row)
-      matches.push(data) if data['date'] > @today
-    end
-    matches
+  def match_length
+    60 * 105
   end
 end

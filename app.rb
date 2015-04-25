@@ -1,6 +1,8 @@
 # encoding: utf-8
-require 'calendar'
+require 'rubygems'
+require 'bundler/setup'
 require 'sinatra'
+require './calendar'
 
 before do
   logger = Logger.new(STDERR)
@@ -14,7 +16,7 @@ end
 get '/kalender' do
   begin
     calendar = BrannCalendar.new
-    output = calendar.get
+    output = calendar.get('obos-ligaen')
     status 200
     headers \
       "Content-type" => "text/calendar; charset=utf-8",
